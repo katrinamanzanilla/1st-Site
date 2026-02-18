@@ -1,0 +1,333 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>PMG Portal - Issue Tracker</title>
+
+  <link href="https://fonts.googleapis.com/css2?family=Playfair+Display:wght@400;600;700&family=Inter:wght@300;400;500;600&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="style.css" />
+</head>
+<body>
+
+  <header class="navbar">
+    <div class="logo">
+      <a href="index.html"><img src="logo.PNG" alt="APEC" class="logo-img"></a>
+    </div>
+
+    <nav class="nav-links">
+      <a href="index.html">HOME</a>
+      <a href="glinks.html">G.LINKS</a>
+      <a href="downloadables.html">DOWNLOADABLES</a>
+      <a href="tracker.html" class="active">ISSUE TRACKER</a>
+      <a href="projstat.html">PROJECT STATUS</a>
+    </nav>
+
+    <div class="status">APEC HOMES</div>
+  </header>
+
+  <main class="content tracker-page">
+    <div class="tracker-shell alt-layout">
+      <h1 class="page-title">Issue Tracker</h1>
+      <p class="tracker-subtitle">Log issues with complete details, keep a restorable issue list, and monitor counts per status in real-time.</p>
+
+      <section class="tracker-workspace two-panel" aria-label="Issue tracker workspace">
+        <article class="tracker-panel quick-add-panel">
+          <h2 class="tracker-panel-title">Submit Issue</h2>
+          <p class="panel-text">Fill out the issue details below. Click <strong>Add</strong> to save it instantly to your issue list.</p>
+
+          <form id="issue-form" class="issue-form">
+            <div class="form-grid">
+              <label>
+                Project Name
+                <input type="text" id="issue-project" placeholder="Ex: Portal Revamp" required>
+              </label>
+              <label>
+                Issue Date
+                <input type="date" id="issue-date" required>
+              </label>
+            </div>
+
+            <label>
+              Issue Title
+              <input type="text" id="issue-title" placeholder="Ex: Login page not responsive" required>
+            </label>
+
+            <div class="form-grid">
+              <label>
+                Status
+                <select id="issue-status" required>
+                  <option>Open</option>
+                  <option>In Progress</option>
+                  <option>Delayed</option>
+                  <option>Resolved</option>
+                </select>
+              </label>
+              <label>
+                Priority
+                <select id="issue-priority">
+                  <option>High</option>
+                  <option>Medium</option>
+                  <option>Low</option>
+                </select>
+              </label>
+            </div>
+
+            <div class="form-grid">
+              <label>
+                Assignee
+                <input type="text" id="issue-assignee" placeholder="Ex: John Doe">
+              </label>
+              <label>
+                Target Resolution Date
+                <input type="date" id="issue-target-date">
+              </label>
+            </div>
+
+            <label>
+              Notes
+              <textarea id="issue-notes" rows="3" placeholder="Short issue context"></textarea>
+            </label>
+
+            <div class="tracker-actions">
+              <button type="submit" class="tracker-btn primary" id="add-entry-btn">Add</button>
+              <button type="button" class="tracker-btn ghost" id="reset-btn">Reset</button>
+              <button type="button" class="tracker-btn ghost" id="restore-entry-btn" disabled>Restore Last Deleted</button>
+            </div>
+            <p class="copy-feedback" id="copy-feedback" aria-live="polite"></p>
+            <p class="add-feedback" id="add-feedback" aria-live="polite"></p>
+          </form>
+
+        </article>
+
+        <article class="tracker-panel sheet-panel">
+          <h2 class="tracker-panel-title">Issue Dashboard</h2>
+          <p class="panel-text">Status boxes show how many issues exist per status (for example, <strong>Delayed</strong>).</p>
+
+          <section aria-label="Issue status summary" class="status-summary-grid" id="status-summary-grid"></section>
+
+          <section class="local-entries local-entries-inline" aria-label="Saved issue entries">
+            <div class="local-entries-head">
+              <h3>Saved Issue List <span class="saved-count" id="saved-count">(0)</span></h3>
+            </div>
+
+            <div class="entries-table-wrap">
+              <table class="issues-table">
+                <thead>
+                  <tr>
+                    <th>Project</th>
+                    <th>Title</th>
+                    <th>Status</th>
+                    <th>Issue Date</th>
+                    <th>Action</th>
+                  </tr>
+                </thead>
+                <tbody id="recent-entries"></tbody>
+              </table>
+            </div>
+          </section>
+        </article>
+      </section>
+    </div>
+  </main>
+
+  <script>
+    const issueForm = document.getElementById('issue-form');
+    const copyFeedback = document.getElementById('copy-feedback');
+    const addFeedback = document.getElementById('add-feedback');
+    const resetBtn = document.getElementById('reset-btn');
+    const recentEntries = document.getElementById('recent-entries');
+    const restoreEntryBtn = document.getElementById('restore-entry-btn');
+    const statusSummaryGrid = document.getElementById('status-summary-grid');
+    const savedCount = document.getElementById('saved-count');
+
+    const LOCAL_KEY = 'issueTrackerRecentEntries';
+    const MAX_ENTRIES = 100;
+    const STATUS_TYPES = ['Open', 'In Progress', 'Delayed', 'Resolved'];
+
+    let deletedEntriesStack = [];
+
+    function formatDate(rawDate) {
+      if (!rawDate) return '-';
+      const parsedDate = new Date(rawDate + 'T00:00:00');
+      if (Number.isNaN(parsedDate.getTime())) return rawDate;
+      return parsedDate.toLocaleDateString('en-US', { month: 'short', day: '2-digit', year: 'numeric' });
+    }
+
+    function sanitizeText(value) {
+      return String(value || '').replace(/[\t\n\r]+/g, ' ').trim();
+    }
+
+    function getStoredEntries() {
+      try {
+        return JSON.parse(localStorage.getItem(LOCAL_KEY)) || [];
+      } catch (error) {
+        return [];
+      }
+    }
+
+    function saveEntries(entries) {
+      localStorage.setItem(LOCAL_KEY, JSON.stringify(entries.slice(0, MAX_ENTRIES)));
+    }
+
+    function updateRestoreState() {
+      restoreEntryBtn.disabled = deletedEntriesStack.length === 0;
+    }
+
+    function removeEntry(createdAt) {
+      const entries = getStoredEntries();
+      const targetIndex = entries.findIndex((entry) => entry.createdAt === createdAt);
+      if (targetIndex === -1) return;
+
+      const [removed] = entries.splice(targetIndex, 1);
+      if (removed) {
+        deletedEntriesStack.push(removed);
+        saveEntries(entries);
+        renderEntries(entries);
+        addFeedback.textContent = `Deleted "${removed.title}".`;
+        updateRestoreState();
+      }
+    }
+
+    function restoreLastDeletedEntry() {
+      if (!deletedEntriesStack.length) {
+        return;
+      }
+      const entries = getStoredEntries();
+      const restored = deletedEntriesStack.pop();
+      entries.unshift(restored);
+      saveEntries(entries);
+      renderEntries(entries);
+      addFeedback.textContent = `Restored "${restored.title}".`;
+      updateRestoreState();
+    }
+
+    function renderStatusSummary(entries) {
+      const counts = STATUS_TYPES.reduce((acc, status) => {
+        acc[status] = 0;
+        return acc;
+      }, {});
+
+      entries.forEach((entry) => {
+        if (!counts[entry.status] && counts[entry.status] !== 0) {
+          counts[entry.status] = 0;
+        }
+        counts[entry.status] += 1;
+      });
+
+      statusSummaryGrid.innerHTML = '';
+      const summaryItems = [['Total', entries.length], ...Object.entries(counts)];
+      summaryItems.forEach(([status, count]) => {
+        const box = document.createElement('article');
+        box.className = 'status-summary-box';
+
+        const label = document.createElement('span');
+        label.className = 'status-summary-label';
+        label.textContent = status;
+
+        const value = document.createElement('strong');
+        value.className = 'status-summary-value';
+        value.textContent = String(count);
+
+        box.append(label, value);
+        statusSummaryGrid.appendChild(box);
+      });
+    }
+
+    function renderEntries(entries = getStoredEntries()) {
+      recentEntries.innerHTML = '';
+
+      if (!entries.length) {
+        savedCount.textContent = '(0)';
+        recentEntries.innerHTML = '<tr><td colspan="5" class="empty-entry">No entries yet.</td></tr>';
+        renderStatusSummary(entries);
+        return;
+      }
+
+      savedCount.textContent = `(${entries.length})`;
+
+      entries.forEach((entry) => {
+        const row = document.createElement('tr');
+
+        const projectTd = document.createElement('td');
+        projectTd.textContent = entry.project;
+
+        const titleTd = document.createElement('td');
+        titleTd.textContent = entry.title;
+
+        const statusTd = document.createElement('td');
+        statusTd.textContent = entry.status;
+
+        const issueDateTd = document.createElement('td');
+        issueDateTd.textContent = entry.issueDate;
+
+        row.append(projectTd, titleTd, statusTd, issueDateTd);
+
+        const actionTd = document.createElement('td');
+        const deleteBtn = document.createElement('button');
+        deleteBtn.type = 'button';
+        deleteBtn.className = 'icon-btn delete-btn';
+        deleteBtn.title = 'Delete';
+        deleteBtn.setAttribute('aria-label', `Delete ${entry.title}`);
+        deleteBtn.textContent = 'Delete';
+        deleteBtn.addEventListener('click', () => removeEntry(entry.createdAt));
+
+        actionTd.appendChild(deleteBtn);
+        row.appendChild(actionTd);
+        recentEntries.appendChild(row);
+      });
+
+      renderStatusSummary(entries);
+    }
+
+    function saveEntry(entry) {
+      const entries = getStoredEntries();
+      entries.unshift(entry);
+      saveEntries(entries);
+      renderEntries(entries);
+    }
+
+    issueForm.addEventListener('submit', (event) => {
+      event.preventDefault();
+
+      const issueProject = sanitizeText(document.getElementById('issue-project').value || '-');
+      const issueTitle = sanitizeText(document.getElementById('issue-title').value || '-');
+      const issueStatus = document.getElementById('issue-status').value;
+      const issuePriority = document.getElementById('issue-priority').value;
+      const issueAssignee = sanitizeText(document.getElementById('issue-assignee').value || 'Unassigned');
+      const issueDate = formatDate(document.getElementById('issue-date').value);
+      const issueTargetDate = formatDate(document.getElementById('issue-target-date').value);
+      const issueNotes = sanitizeText(document.getElementById('issue-notes').value || '-');
+
+      addFeedback.textContent = '✅ Issue added to saved issue list.';
+      copyFeedback.textContent = '';
+
+      saveEntry({
+        createdAt: Date.now(),
+        project: issueProject,
+        title: issueTitle,
+        status: issueStatus,
+        priority: issuePriority,
+        assignee: issueAssignee,
+        issueDate,
+        targetDate: issueTargetDate,
+        notes: issueNotes
+      });
+
+      issueForm.reset();
+    });
+
+    resetBtn.addEventListener('click', () => {
+      issueForm.reset();
+      copyFeedback.textContent = 'Form reset.';
+      addFeedback.textContent = '';
+    });
+
+    restoreEntryBtn.addEventListener('click', restoreLastDeletedEntry);
+
+    updateRestoreState();
+    renderEntries();
+  </script>
+
+</body>
+</html>

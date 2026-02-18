@@ -1,0 +1,288 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>PMG Portal</title>
+
+  <link href="https://fonts.googleapis.com/css2?family=Playfair+Display:wght@400;600&family=Inter:wght@300;400;500&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="style.css" />
+</head>
+<body>
+
+  <header class="navbar">
+    <div class="logo">
+      <a href="index.html" class="active"><img src="logo.PNG" alt="APEC" class="logo-img"></a>
+    </div>
+
+    <nav class="nav-links">
+      <a href="index.html">HOME</a>
+      <a href="glinks.html">G.LINKS</a>
+      <a href="downloadables.html" class="active">DOWNLOADABLES</a>
+      <a href="tracker.html">ISSUE TRACKER</a>
+      <a href="projstat.html">PROJECT STATUS</a>
+    </nav>
+
+    <div class="status">APEC HOMES</div>
+  </header>
+
+
+  <main class="content">
+    <div class="container downloadables-container">
+      <h1 class="page-title">Downloadable Manuals & Forms</h1>
+      <p class="downloadables-intro">Add, search, and manage downloadable manuals and forms.</p>
+
+      <section class="download-manager">
+        <h2 class="section-title">Add File</h2>
+        <form id="download-form" class="download-form" autocomplete="off">
+          <label>
+            Google Link
+            <input id="file-link" type="url" placeholder="https://drive.google.com/..." required>
+          </label>
+
+          <label>
+            File Type
+            <select id="file-type" required>
+              <option value="">Select type</option>
+              <option value="Manual">Manual</option>
+              <option value="Form">Form</option>
+            </select>
+          </label>
+
+          <label>
+            File Name
+            <input id="file-name" type="text" placeholder="Enter file name" required>
+          </label>
+
+          <div class="form-actions">
+            <button type="submit" class="pill-button">Add</button>
+            <button type="button" id="reset-form" class="pill-button button-muted">Reset</button>
+          </div>
+        </form>
+      </section>
+
+      <section class="download-browser">
+        <div class="browser-controls">
+          <button id="manuals-tab" class="drive-button tab-button active" type="button">Downloadable Manuals</button>
+          <button id="forms-tab" class="drive-button tab-button" type="button">Downloadable Forms</button>
+        </div>
+
+        <label class="search-wrap" for="search-files">
+          Search by file name
+          <input id="search-files" type="search" placeholder="Search manuals or forms">
+        </label>
+
+        <h2 id="list-title" class="section-title list-title">Open Downloadable Manuals</h2>
+        <div id="files-container" class="file-list"></div>
+      </section>
+    </div>
+  </main>
+
+  <script>
+    const STORAGE_KEY = 'downloadables-data-v1';
+
+    const formEl = document.getElementById('download-form');
+    const linkEl = document.getElementById('file-link');
+    const typeEl = document.getElementById('file-type');
+    const nameEl = document.getElementById('file-name');
+    const resetBtn = document.getElementById('reset-form');
+    const manualsTab = document.getElementById('manuals-tab');
+    const formsTab = document.getElementById('forms-tab');
+    const searchEl = document.getElementById('search-files');
+    const filesContainer = document.getElementById('files-container');
+    const listTitle = document.getElementById('list-title');
+
+    let activeCategory = 'Manual';
+    let records = loadRecords();
+
+    function loadRecords() {
+      const saved = localStorage.getItem(STORAGE_KEY);
+      if (!saved) {
+        return [];
+      }
+
+      try {
+        const parsed = JSON.parse(saved);
+        return Array.isArray(parsed) ? parsed : [];
+      } catch {
+        return [];
+      }
+    }
+
+    function saveRecords() {
+      localStorage.setItem(STORAGE_KEY, JSON.stringify(records));
+    }
+
+    function getGoogleDriveFileId(urlValue) {
+      const patterns = [
+        /\/file\/d\/([a-zA-Z0-9_-]+)/,
+        /[?&]id=([a-zA-Z0-9_-]+)/,
+        /\/d\/([a-zA-Z0-9_-]+)/
+      ];
+
+      for (const pattern of patterns) {
+        const match = urlValue.match(pattern);
+        if (match && match[1]) {
+          return match[1];
+        }
+      }
+
+      return null;
+    }
+
+    function toDownloadLink(urlValue) {
+      const fileId = getGoogleDriveFileId(urlValue);
+      if (fileId) {
+        return `https://drive.google.com/uc?export=download&id=${fileId}`;
+      }
+
+      return urlValue;
+    }
+
+    function updateTabState() {
+      const manualsActive = activeCategory === 'Manual';
+      manualsTab.classList.toggle('active', manualsActive);
+      formsTab.classList.toggle('active', !manualsActive);
+      listTitle.textContent = manualsActive ? 'Open Downloadable Manuals' : 'Open Downloadable Forms';
+    }
+
+    function downloadFile(record) {
+      const anchor = document.createElement('a');
+      anchor.href = record.downloadLink;
+      anchor.download = record.name;
+      anchor.target = '_blank';
+      anchor.rel = 'noopener noreferrer';
+      document.body.appendChild(anchor);
+      anchor.click();
+      anchor.remove();
+    }
+
+    function deleteRecord(recordId) {
+      records = records.map((record) => {
+        if (record.id === recordId) {
+          return { ...record, deleted: true };
+        }
+
+        return record;
+      });
+
+      saveRecords();
+      renderList();
+    }
+
+    function restoreRecord(recordId) {
+      records = records.map((record) => {
+        if (record.id === recordId) {
+          return { ...record, deleted: false };
+        }
+
+        return record;
+      });
+
+      saveRecords();
+      renderList();
+    }
+
+    function renderList() {
+      const query = searchEl.value.trim().toLowerCase();
+      const filtered = records.filter((record) => {
+        if (record.type !== activeCategory) {
+          return false;
+        }
+
+        if (!query) {
+          return true;
+        }
+
+        return record.name.toLowerCase().includes(query);
+      });
+
+      if (filtered.length === 0) {
+        filesContainer.innerHTML = '<p class="empty-state">No files found.</p>';
+        return;
+      }
+
+      filesContainer.innerHTML = '';
+
+      filtered.forEach((record) => {
+        const item = document.createElement('article');
+        item.className = `file-item ${record.deleted ? 'is-deleted' : ''}`;
+
+        const title = document.createElement('h3');
+        title.className = 'file-name';
+        title.textContent = record.name;
+
+        const meta = document.createElement('p');
+        meta.className = 'file-meta';
+        meta.textContent = record.deleted ? 'Deleted' : 'Active';
+
+        const actions = document.createElement('div');
+        actions.className = 'file-actions';
+
+        const downloadBtn = document.createElement('button');
+        downloadBtn.type = 'button';
+        downloadBtn.className = 'pill-button';
+        downloadBtn.textContent = 'Download';
+        downloadBtn.disabled = record.deleted;
+        downloadBtn.addEventListener('click', () => downloadFile(record));
+
+        const deleteBtn = document.createElement('button');
+        deleteBtn.type = 'button';
+        deleteBtn.className = 'pill-button button-muted';
+        deleteBtn.textContent = 'Delete';
+        deleteBtn.disabled = record.deleted;
+        deleteBtn.addEventListener('click', () => deleteRecord(record.id));
+
+        const restoreBtn = document.createElement('button');
+        restoreBtn.type = 'button';
+        restoreBtn.className = 'pill-button button-restore';
+        restoreBtn.textContent = 'Restore';
+        restoreBtn.disabled = !record.deleted;
+        restoreBtn.addEventListener('click', () => restoreRecord(record.id));
+
+        actions.append(downloadBtn, deleteBtn, restoreBtn);
+        item.append(title, meta, actions);
+        filesContainer.appendChild(item);
+      });
+    }
+
+    formEl.addEventListener('submit', (event) => {
+      event.preventDefault();
+
+      const newRecord = {
+        id: crypto.randomUUID(),
+        url: linkEl.value.trim(),
+        downloadLink: toDownloadLink(linkEl.value.trim()),
+        type: typeEl.value,
+        name: nameEl.value.trim(),
+        deleted: false
+      };
+
+      records.unshift(newRecord);
+      saveRecords();
+      formEl.reset();
+      renderList();
+    });
+
+    resetBtn.addEventListener('click', () => formEl.reset());
+
+    manualsTab.addEventListener('click', () => {
+      activeCategory = 'Manual';
+      updateTabState();
+      renderList();
+    });
+
+    formsTab.addEventListener('click', () => {
+      activeCategory = 'Form';
+      updateTabState();
+      renderList();
+    });
+
+    searchEl.addEventListener('input', renderList);
+
+    updateTabState();
+    renderList();
+  </script>
+
+</body>
+</html>

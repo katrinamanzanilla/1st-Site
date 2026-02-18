@@ -1,0 +1,90 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>PMG Portal</title>
+  <link href="https://fonts.googleapis.com/css2?family=Playfair+Display:wght@400;600&family=Inter:wght@300;400;500&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="style.css" />
+</head>
+<body>
+  <header class="navbar">
+    <div class="logo">
+      <a href="index.html" class="active"><img src="logo.PNG" alt="APEC" class="logo-img"></a>
+    </div>
+
+    <nav class="nav-links">
+      <a href="index.html">HOME</a>
+      <a href="glinks.html">G.LINKS</a>
+      <a href="downloadables.html">DOWNLOADABLES</a>
+      <a href="tracker.html">ISSUE TRACKER</a>
+      <a href="projstat.html" class="active">PROJECT STATUS</a>
+    </nav>
+
+    <div class="status">APEC HOMES</div>
+  </header>
+
+  <main class="content status-page">
+    <div class="status-shell">
+      <section class="status-top">
+        <h1 class="page-title">Project Status Overview</h1>
+        <p class="status-intro">Track all project milestones in one place. Paste any Google Sheets link, click <strong>View Data</strong>, and instantly review summary counts, filters, and complete table details.</p>
+
+        <form id="sheet-source-form" class="status-source-form" autocomplete="off">
+          <label for="sheet-source-input" class="status-source-label">Project Status Google Sheet</label>
+          <div class="status-source-row">
+            <input id="sheet-source-input" class="status-source-input" type="text" placeholder="Paste Google Sheets link or Sheet ID" required>
+            <button type="submit" id="use-file-button" class="drive-button">View Data</button>
+            <button type="button" id="sheet-source-reset" class="tracker-btn ghost">Reset</button>
+          </div>
+          <p id="sheet-source-feedback" class="copy-feedback" aria-live="polite"></p>
+        </form>
+      </section>
+
+      <section class="status-kpis" aria-label="Summary scorecard">
+        <article class="metric-card">
+          <span class="metric-label">Total Projects</span>
+          <strong class="metric-value" id="kpi-total-projects">0</strong>
+        </article>
+        <article class="metric-card">
+          <span class="metric-label">Total Milestones</span>
+          <strong class="metric-value" id="kpi-total-milestones">0</strong>
+        </article>
+      </section>
+
+      <section class="status-panel full-width" aria-label="Filters and search">
+        <div class="panel-title-row">
+          <h2 class="tracker-panel-title">Filters &amp; Search</h2>
+          <span class="layout-note">Filter by system, milestone, or keyword</span>
+        </div>
+        <div class="status-source-row">
+          <select id="system-filter" class="status-source-input" aria-label="Filter by System">
+            <option value="">All Systems</option>
+          </select>
+          <select id="milestone-filter" class="status-source-input" aria-label="Filter by Milestone">
+            <option value="">All Milestones</option>
+          </select>
+          <input id="sheet-search" class="status-source-input" type="search" placeholder="Search system, developer, project manager, milestone" aria-label="Search data">
+        </div>
+      </section>
+
+      <section class="status-grid" aria-label="Project status details">
+        <article class="status-panel full-width" id="project-status-table" tabindex="-1">
+          <div class="panel-title-row">
+            <h2 class="tracker-panel-title">Project Timeline Table</h2>
+            <span class="layout-note">All rows and columns from the selected sheet</span>
+          </div>
+          <div class="sheet-preview-wrap">
+            <table class="issues-table">
+              <thead id="status-table-head"></thead>
+              <tbody id="status-table-body"></tbody>
+            </table>
+          </div>
+        </article>
+      </section>
+    </div>
+  </main>
+
+  <script src="projstat.js"></script>
+</body>
+</html>
